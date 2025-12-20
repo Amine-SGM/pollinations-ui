@@ -1,0 +1,7 @@
+{
+  "name": "Pollinations Chat",
+  "description": "A web interface for interacting with the Pollinations.ai API, featuring text and image generation capabilities.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
