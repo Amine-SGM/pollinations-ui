@@ -35,8 +35,6 @@ export interface ChatSession {
 
 export interface AppSettings {
   apiKey: string;
-  useCustomEndpoint: boolean;
-  customEndpoint: string;
   textModel: string;
   imageModel: string;
   videoModel: string;

@@ -1,6 +1,9 @@
 import { AppSettings, MediaType, GenerationParams } from '../types';
 
 const BASE_URL = 'https://gen.pollinations.ai';
+// The public key set by the developer in .env — safe for client-side use.
+// Users can override it by entering their own key in Settings.
+const ENV_PUBLIC_KEY: string = (import.meta as any).env.VITE_POLLINATIONS_API_KEY || '';
 
 export class PollinationsService {
   private settings: AppSettings;
@@ -13,6 +16,16 @@ export class PollinationsService {
     this.settings = newSettings;
   }
 
+  /** Returns the effective API key: user's personal key, or falls back to the env public key. */
+  getApiKey(): string {
+    return this.settings.apiKey?.trim() || ENV_PUBLIC_KEY;
+  }
+
+  /** True when only the env default key is being used (no user key set). */
+  isUsingDefaultKey(): boolean {
+    return !this.settings.apiKey?.trim() && !!ENV_PUBLIC_KEY;
+  }
+
   getMediaUrl(prompt: string, type: MediaType, seed: number, params: GenerationParams): string {
     const encodedPrompt = encodeURIComponent(prompt);
     const query = new URLSearchParams();
@@ -21,10 +34,11 @@ export class PollinationsService {
     query.append('seed', seed.toString());
     if (params.private) query.append('private', 'true');
     if (params.nologo) query.append('nologo', 'true');
-    
+
     // Add API Key to GET requests for tracking
-    if (this.settings.apiKey) {
-      query.append('key', this.settings.apiKey);
+    const apiKey = this.getApiKey();
+    if (apiKey) {
+      query.append('key', apiKey);
     }
 
     switch (type) {
@@ -37,7 +51,7 @@ export class PollinationsService {
         if (params.imageUrl) query.append('image', params.imageUrl);
         if (params.negativePrompt) query.append('negative_prompt', params.negativePrompt);
         return `${BASE_URL}/image/${encodedPrompt}?${query.toString()}`;
-      
+
       // Video is now handled by generateVideo async method, but we keep this for fallback/sync usage if needed
       case 'video':
         query.append('model', this.settings.videoModel || 'veo');
@@ -47,16 +61,16 @@ export class PollinationsService {
         if (params.duration) query.append('duration', params.duration.toString());
         if (params.negativePrompt) query.append('negative_prompt', params.negativePrompt);
         return `${BASE_URL}/image/${encodedPrompt}?${query.toString()}`;
-      
+
       case 'audio':
         // Audio handled by generateAudio
         let audioModel = this.settings.audioModel || 'openai-audio';
         if (audioModel.includes('gemini') && !audioModel.includes('audio')) {
-             audioModel = 'openai-audio';
+          audioModel = 'openai-audio';
         }
         query.append('model', audioModel);
         return `${BASE_URL}/text/${encodedPrompt}?${query.toString()}`;
-      
+
       default:
         return '';
     }
@@ -65,30 +79,31 @@ export class PollinationsService {
   async generateVideo(prompt: string, seed: number, params: GenerationParams): Promise<string> {
     const encodedPrompt = encodeURIComponent(prompt);
     const query = new URLSearchParams();
-    
+
     const model = this.settings.videoModel || 'veo';
     query.append('model', model);
     query.append('seed', seed.toString());
-    
+
     // Ensure valid aspect ratio for video models (veo/seedance only support 16:9 or 9:16)
     // Defaulting 1:1 to 16:9 to avoid 400 errors
     let ratio = params.aspectRatio || '16:9';
     if (ratio !== '16:9' && ratio !== '9:16') {
-        ratio = '16:9';
+      ratio = '16:9';
     }
     query.append('aspectRatio', ratio);
 
     if (params.private) query.append('private', 'true');
     if (params.nologo) query.append('nologo', 'true');
-    
+
     // Video specific params
     if (params.quality) query.append('quality', params.quality);
     if (params.imageUrl) query.append('image', params.imageUrl);
     if (params.duration) query.append('duration', params.duration.toString());
     if (params.negativePrompt) query.append('negative_prompt', params.negativePrompt);
 
-    if (this.settings.apiKey) {
-      query.append('key', this.settings.apiKey);
+    const apiKey = this.getApiKey();
+    if (apiKey) {
+      query.append('key', apiKey);
     }
 
     const url = `${BASE_URL}/image/${encodedPrompt}?${query.toString()}`;
@@ -110,26 +125,29 @@ export class PollinationsService {
   async generateAudio(prompt: string, seed: number): Promise<string> {
     const encodedPrompt = encodeURIComponent(prompt);
     const query = new URLSearchParams();
-    
-    let model = this.settings.audioModel || 'openai-audio';
-    if (model.includes('gemini') && !model.includes('audio')) {
-        model = 'openai-audio';
+
+    let model = this.settings.audioModel || 'elevenlabs';
+    // Strip out any text-only models that don't belong on the audio endpoint
+    if (!['elevenlabs', 'elevenmusic'].includes(model)) {
+      model = 'elevenlabs';
     }
 
     query.append('model', model);
     query.append('seed', seed.toString());
-    
-    if (this.settings.apiKey) {
-      query.append('key', this.settings.apiKey);
+
+    const apiKey = this.getApiKey();
+    if (apiKey) {
+      query.append('key', apiKey);
     }
-    
-    const url = `${BASE_URL}/text/${encodedPrompt}?${query.toString()}`;
-    
+
+    // Correct audio endpoint: /audio/{text}
+    const url = `${BASE_URL}/audio/${encodedPrompt}?${query.toString()}`;
+
     try {
       const response = await fetch(url);
       if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Server returned ${response.status}: ${errorText.substring(0, 100)}`);
+        const errorText = await response.text();
+        throw new Error(`Server returned ${response.status}: ${errorText.substring(0, 100)}`);
       }
       const blob = await response.blob();
       return URL.createObjectURL(blob);
@@ -140,11 +158,9 @@ export class PollinationsService {
   }
 
   async sendTextMessage(prompt: string, history: { role: string; content: string }[], params: GenerationParams): Promise<string> {
-    const endpoint = this.settings.useCustomEndpoint 
-      ? this.settings.customEndpoint 
-      : `${BASE_URL}/v1/chat/completions`;
+    const endpoint = `${BASE_URL}/v1/chat/completions`;
 
-    const systemMessage = params.system 
+    const systemMessage = params.system
       ? { role: 'system', content: params.system }
       : { role: 'system', content: 'You are a helpful AI assistant.' };
 
@@ -172,7 +188,7 @@ export class PollinationsService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(this.settings.apiKey ? { 'Authorization': `Bearer ${this.settings.apiKey}` } : {}),
+          ...(this.getApiKey() ? { 'Authorization': `Bearer ${this.getApiKey()}` } : {}),
         },
         body: JSON.stringify(body),
       });
@@ -180,6 +196,12 @@ export class PollinationsService {
       const responseText = await response.text();
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('⚠️ API key required. Please add your Pollinations API key in Settings → Your API Key. Get one at enter.pollinations.ai');
+        }
+        if (response.status === 402) {
+          throw new Error('⚠️ Insufficient pollen balance. Please check your account at enter.pollinations.ai');
+        }
         throw new Error(`API Error: ${response.status} - ${responseText}`);
       }
 
