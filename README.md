@@ -56,12 +56,6 @@ A modern, feature-rich chat interface for interacting with the [Pollinations AI]
 
 4. Open your browser and navigate to `http://localhost:5173`.
 
-## ⚙️ Configuration
-
-You can configure the application through the **Settings** modal within the UI:
-- **API Key**: Add your Pollinations API key for tracked requests.
-- **Custom Endpoints**: Toggle and set custom API endpoints.
-- **Model Preferences**: Set default models for text, image, video, and audio.
 
 ## 📂 Project Structure
 
