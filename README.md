@@ -6,9 +6,9 @@ A modern, feature-rich chat interface for interacting with the [Pollinations AI]
 
 > Place the screenshot files in `docs/screenshots/` with the names below.
 
-| Main UI | Global Settings | Generation Options |
-| --- | --- | --- |
-| ![Main UI](docs/screenshots/main-ui.png) | ![Global Settings](docs/screenshots/global-settings.png) | ![Generation Options](docs/screenshots/generation-options.png) |
+| Main UI | Generation Options |
+| --- | --- |
+| ![Main UI](docs/screenshots/main-ui.png) | ![Generation Options](docs/screenshots/generation-options.png) |
 
 ## 🚀 Features
 
