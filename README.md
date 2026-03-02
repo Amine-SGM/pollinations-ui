@@ -1,6 +1,8 @@
 # Pollinations Chat
 
-A modern, feature-rich chat interface for interacting with the [Pollinations AI](https://pollinations.ai/) ecosystem. This application allows users to generate text, images, video, and audio through a unified and intuitive interface.
+[![Built with Pollinations.ai](https://pollinations.ai/badge.svg)](https://pollinations.ai)
+
+A modern, feature-rich chat interface for interacting with the [Pollinations AI](https://pollinations.ai/) ecosystem. This application allows users to generate text, images, video, and audio through a unified and intuitive interface, leveraging Pollinations' powerful multi-modal API capabilities.
 
 ## 📸 Screenshots
 
@@ -67,4 +69,18 @@ A modern, feature-rich chat interface for interacting with the [Pollinations AI]
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+---
+
+## 🚀 Pollinations Tier-App Submission Details
+
+| Field | Details |
+| :--- | :--- |
+| **App Name** | Pollinations Chat |
+| **App Description** | A multi-modal chat interface for Pollinations AI, supporting text, image, and video generation with advanced controls. |
+| **App URL** | [https://pollinations-chat.vercel.app](https://pollinations-chat.vercel.app) (Update with your live URL) |
+| **GitHub Repo** | [https://github.com/Amine-SGM/pollinations-chat](https://github.com/Amine-SGM/pollinations-chat) |
+| **Discord Username** | [Your Discord Username] |
+| **Contact / Email** | [Your Email/Twitter/Contact] |
+| **App Language** | English (en) |
 
