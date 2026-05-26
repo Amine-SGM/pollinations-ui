@@ -3,7 +3,7 @@ import { X, Save, Wallet, Loader2, RefreshCw, AlertCircle, CheckCircle2 } from '
 import { AppSettings } from '../types';
 
 // The developer's public env key — safe for client-side, used as fallback
-const ENV_PUBLIC_KEY: string = (import.meta as any).env?.VITE_POLLINATIONS_API_KEY || '';
+const ENV_PUBLIC_KEY: string = (import.meta as any).env?.VITE_POLLINATIONS_API_KEY || 'pk_gWWKNs9f8NS8DqCW';
 
 interface SettingsModalProps {
   isOpen: boolean;
