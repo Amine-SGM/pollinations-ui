@@ -66,7 +66,7 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('pollinations_settings');
 
     return saved ? JSON.parse(saved) : {
-      apiKey: '',          // empty = use the env public key as fallback
+      apiKey: 'pk_gWWKNs9f8NS8DqCW',          // empty = use the env public key as fallback
       textModel: 'openai',
       imageModel: 'flux',
       videoModel: 'veo',
