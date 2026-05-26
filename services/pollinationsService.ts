@@ -3,7 +3,7 @@ import { AppSettings, MediaType, GenerationParams } from '../types';
 const BASE_URL = 'https://gen.pollinations.ai';
 // The public key set by the developer in .env — safe for client-side use.
 // Users can override it by entering their own key in Settings.
-const ENV_PUBLIC_KEY: string = (import.meta as any).env.VITE_POLLINATIONS_API_KEY || '';
+const ENV_PUBLIC_KEY: string = (import.meta as any).env.VITE_POLLINATIONS_API_KEY || 'pk_gWWKNs9f8NS8DqCW';
 
 export class PollinationsService {
   private settings: AppSettings;
