@@ -18,6 +18,91 @@ declare global {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+const MODEL_LABELS: Record<string, string> = {
+  openai: 'OpenAI',
+  'openai-large': 'OpenAI Large',
+  'openai-fast': 'OpenAI Fast',
+  gemini: 'Gemini',
+  'gemini-fast': 'Gemini Fast',
+  'gemini-large': 'Gemini Large',
+  'gemini-search': 'Gemini Search',
+  claude: 'Claude',
+  'claude-large': 'Claude Large',
+  'claude-fast': 'Claude Fast',
+  mistral: 'Mistral',
+  'qwen-coder': 'Qwen Coder',
+  deepseek: 'DeepSeek',
+  grok: 'Grok',
+  'perplexity-fast': 'Perplexity Fast',
+  'perplexity-reasoning': 'Perplexity Reasoning',
+  searchgpt: 'SearchGPT',
+  chickytutor: 'ChickyTutor',
+  'kimi-k2-thinking': 'Kimi K2 Thinking',
+  'nova-micro': 'Nova Micro',
+  flux: 'Flux',
+  'flux-realism': 'Flux Realism',
+  'flux-anime': 'Flux Anime',
+  'flux-3d': 'Flux 3D',
+  'any-dark': 'Any Dark',
+  turbo: 'Turbo',
+  kontext: 'Kontext',
+  gptimage: 'GPT Image',
+  nanobanana: 'NanoBanana',
+  'nanobanana-pro': 'NanoBanana Pro',
+  seedream: 'Seedream',
+  'seedream-pro': 'Seedream Pro',
+  zimage: 'ZImage',
+  veo: 'Veo',
+  seedance: 'Seedance',
+  'seedance-pro': 'Seedance Pro',
+  'openai-audio': 'OpenAI Audio',
+};
+
+const formatModelLabel = (model: string) => {
+  if (MODEL_LABELS[model]) {
+    return MODEL_LABELS[model];
+  }
+
+  return model
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+};
+
+type ModelOption = {
+  id: string;
+  label: string;
+};
+
+const getDocModelLabel = (model: { name?: string; description?: string }) => {
+  const labelFromDocs = model.description?.split(' - ')[0]?.trim();
+  return labelFromDocs || formatModelLabel(model.name || '');
+};
+
+const toFallbackModelOptions = (models: string[]): ModelOption[] => models.map(id => ({
+  id,
+  label: formatModelLabel(id),
+}));
+
+const toModelOptions = (models: any[], modality: MediaType, excludeSpecialized = false): ModelOption[] => {
+  const seen = new Set<string>();
+
+  return models
+    .filter(model => model.output_modalities?.includes(modality))
+    .filter(model => !excludeSpecialized || !model.is_specialized)
+    .map(model => ({
+      id: model.name ?? model.id ?? '',
+      label: getDocModelLabel(model),
+    }))
+    .filter(model => {
+      if (!model.id || seen.has(model.id)) {
+        return false;
+      }
+
+      seen.add(model.id);
+      return true;
+    });
+};
+
 const App: React.FC = () => {
   // State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -28,10 +113,10 @@ const App: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
 
   // Dynamic models
-  const [textModels, setTextModels] = useState<string[]>(TEXT_MODELS);
-  const [imageModels, setImageModels] = useState<string[]>(IMAGE_MODELS);
-  const [videoModels, setVideoModels] = useState<string[]>(VIDEO_MODELS);
-  const [audioModels, setAudioModels] = useState<string[]>(AUDIO_MODELS);
+  const [textModels, setTextModels] = useState<ModelOption[]>(toFallbackModelOptions(TEXT_MODELS));
+  const [imageModels, setImageModels] = useState<ModelOption[]>(toFallbackModelOptions(IMAGE_MODELS));
+  const [videoModels, setVideoModels] = useState<ModelOption[]>(toFallbackModelOptions(VIDEO_MODELS));
+  const [audioModels, setAudioModels] = useState<ModelOption[]>(toFallbackModelOptions(AUDIO_MODELS));
 
   // UI State
   const [showParams, setShowParams] = useState(false);
@@ -136,10 +221,8 @@ const App: React.FC = () => {
     fetch(`${API_BASE}/text/models`, { headers: authHeader })
       .then(r => r.json())
       .then((data: any[]) => {
-        const names = data
-          .filter(m => m.output_modalities?.includes('text') && !m.is_specialized)
-          .map(m => m.name);
-        if (names.length > 0) setTextModels(names);
+        const options = toModelOptions(data, 'text', true);
+        if (options.length > 0) setTextModels(options);
       })
       .catch(() => { }); // silently fallback to constants
 
@@ -147,10 +230,8 @@ const App: React.FC = () => {
     fetch(`${API_BASE}/audio/models`, { headers: authHeader })
       .then(r => r.json())
       .then((data: any[]) => {
-        const names = data
-          .filter(m => m.output_modalities?.includes('audio'))
-          .map(m => m.name);
-        if (names.length > 0) setAudioModels(names);
+        const options = toModelOptions(data, 'audio');
+        if (options.length > 0) setAudioModels(options);
       })
       .catch(() => { });
 
@@ -158,14 +239,10 @@ const App: React.FC = () => {
     fetch(`${API_BASE}/image/models`, { headers: authHeader })
       .then(r => r.json())
       .then((data: any[]) => {
-        const imgNames = data
-          .filter(m => m.output_modalities?.includes('image'))
-          .map(m => m.name);
-        const vidNames = data
-          .filter(m => m.output_modalities?.includes('video'))
-          .map(m => m.name);
-        if (imgNames.length > 0) setImageModels(imgNames);
-        if (vidNames.length > 0) setVideoModels(vidNames);
+        const imageOptions = toModelOptions(data, 'image');
+        const videoOptions = toModelOptions(data, 'video');
+        if (imageOptions.length > 0) setImageModels(imageOptions);
+        if (videoOptions.length > 0) setVideoModels(videoOptions);
       })
       .catch(() => { });
   }, []); // run once on mount
@@ -174,10 +251,10 @@ const App: React.FC = () => {
   useEffect(() => {
     setSettings(prev => ({
       ...prev,
-      textModel: textModels.includes(prev.textModel) ? prev.textModel : textModels[0] || prev.textModel,
-      imageModel: imageModels.includes(prev.imageModel) ? prev.imageModel : imageModels[0] || prev.imageModel,
-      videoModel: videoModels.includes(prev.videoModel) ? prev.videoModel : videoModels[0] || prev.videoModel,
-      audioModel: audioModels.includes(prev.audioModel) ? prev.audioModel : audioModels[0] || prev.audioModel,
+      textModel: textModels.some(model => model.id === prev.textModel) ? prev.textModel : textModels[0]?.id || prev.textModel,
+      imageModel: imageModels.some(model => model.id === prev.imageModel) ? prev.imageModel : imageModels[0]?.id || prev.imageModel,
+      videoModel: videoModels.some(model => model.id === prev.videoModel) ? prev.videoModel : videoModels[0]?.id || prev.videoModel,
+      audioModel: audioModels.some(model => model.id === prev.audioModel) ? prev.audioModel : audioModels[0]?.id || prev.audioModel,
     }));
   }, [textModels, imageModels, videoModels, audioModels]);
 
@@ -581,25 +658,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="relative bg-[#1e1f20] rounded-[28px] border border-[#444746] shadow-lg focus-within:bg-[#2a2b2d] transition-colors">
-            <div className="flex items-end p-2 gap-2">
-
-              {/* Upload Button */}
-              <div className="p-2 pb-3">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                <button
-                  onClick={handleFileSelect}
-                  className="p-2 rounded-full hover:bg-[#333537] text-gray-400 transition-colors"
-                  title="Upload file"
-                >
-                  <Plus size={20} />
-                </button>
-              </div>
-
+            <div className="p-2">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -610,43 +669,84 @@ const App: React.FC = () => {
                 rows={1}
               />
 
-              <div className="p-2 pb-3 flex items-center gap-1">
-                {/* Settings Toggle */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowParams(true);
-                  }}
-                  className={`p-2 rounded-full hover:bg-[#333537] transition-colors ${showParams ? 'text-blue-400 bg-[#333537]' : 'text-gray-400'}`}
-                  title="Generation Settings"
-                >
-                  <SlidersHorizontal size={20} />
-                </button>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <button
+                    onClick={handleFileSelect}
+                    className="p-2 rounded-full hover:bg-[#333537] text-gray-400 transition-colors shrink-0"
+                    title="Upload file"
+                  >
+                    <Plus size={20} />
+                  </button>
 
-                {/* Mic Button - Always visible unless loading, changes state based on listening */}
-                <button
-                  onClick={toggleListening}
-                  disabled={isLoading}
-                  className={`p-2 rounded-full transition-colors ${isListening
-                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 animate-pulse'
-                    : 'hover:bg-[#333537] text-gray-400'
-                    }`}
-                  title="Voice Input"
-                >
-                  <Mic size={20} />
-                </button>
+                  <div className="relative w-36 sm:w-40 shrink-0">
+                    <select
+                      value={getCurrentModel()}
+                      title={formatModelLabel(getCurrentModel())}
+                      onChange={(e) => {
+                        const newModel = e.target.value;
+                        setSettings(prev => ({
+                          ...prev,
+                          textModel: selectedMode === 'text' ? newModel : prev.textModel,
+                          imageModel: selectedMode === 'image' ? newModel : prev.imageModel,
+                          videoModel: selectedMode === 'video' ? newModel : prev.videoModel,
+                          audioModel: selectedMode === 'audio' ? newModel : prev.audioModel,
+                        }));
+                      }}
+                      className="w-full bg-[#0b0b0c] border border-[#444746] rounded-full px-4 py-2 pr-9 text-sm text-white focus:border-blue-500 outline-none transition-colors appearance-none cursor-pointer"
+                    >
+                      {getAvailableModels().map(model => (
+                        <option key={model.id} value={model.id}>{model.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
 
-                {/* Send Button - Only active when text is present, replaces logic where they swapped */}
-                <button
-                  onClick={handleSendMessage}
-                  disabled={isLoading || (!input.trim() && !isListening)} // Disable if empty and not listening
-                  className={`p-2 rounded-full transition-all duration-200 ${isLoading || (!input.trim() && !isListening)
-                    ? 'bg-[#333537] text-gray-500 cursor-not-allowed'
-                    : 'bg-white text-black hover:bg-gray-200'
-                    }`}
-                >
-                  <Send size={18} className={isLoading ? 'opacity-50' : ''} />
-                </button>
+                <div className="flex items-center gap-1">
+                  {/* Settings Toggle */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowParams(true);
+                    }}
+                    className={`p-2 rounded-full hover:bg-[#333537] transition-colors ${showParams ? 'text-blue-400 bg-[#333537]' : 'text-gray-400'}`}
+                    title="Generation Settings"
+                  >
+                    <SlidersHorizontal size={20} />
+                  </button>
+
+                  {/* Mic Button - Always visible unless loading, changes state based on listening */}
+                  <button
+                    onClick={toggleListening}
+                    disabled={isLoading}
+                    className={`p-2 rounded-full transition-colors ${isListening
+                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 animate-pulse'
+                      : 'hover:bg-[#333537] text-gray-400'
+                      }`}
+                    title="Voice Input"
+                  >
+                    <Mic size={20} />
+                  </button>
+
+                  {/* Send Button - Only active when text is present, replaces logic where they swapped */}
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={isLoading || (!input.trim() && !isListening)} // Disable if empty and not listening
+                    className={`p-2 rounded-full transition-all duration-200 ${isLoading || (!input.trim() && !isListening)
+                      ? 'bg-[#333537] text-gray-500 cursor-not-allowed'
+                      : 'bg-white text-black hover:bg-gray-200'
+                      }`}
+                  >
+                    <Send size={18} className={isLoading ? 'opacity-50' : ''} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -676,34 +776,6 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-6">
-
-          {/* Model Selection */}
-          <div className="space-y-2">
-            <label className="text-xs text-gray-400 flex items-center gap-1">
-              Model ({selectedMode})
-            </label>
-            <div className="relative">
-              <select
-                value={getCurrentModel()}
-                onChange={(e) => {
-                  const newModel = e.target.value;
-                  setSettings(prev => ({
-                    ...prev,
-                    textModel: selectedMode === 'text' ? newModel : prev.textModel,
-                    imageModel: selectedMode === 'image' ? newModel : prev.imageModel,
-                    videoModel: selectedMode === 'video' ? newModel : prev.videoModel,
-                    audioModel: selectedMode === 'audio' ? newModel : prev.audioModel,
-                  }));
-                }}
-                className="w-full bg-[#0b0b0c] border border-[#444746] rounded px-3 py-2 text-sm focus:border-blue-500 outline-none transition-colors appearance-none cursor-pointer"
-              >
-                {getAvailableModels().map(model => (
-                  <option key={model} value={model}>{model}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-          </div>
 
           {/* Seed Input */}
           <div className="space-y-2">
