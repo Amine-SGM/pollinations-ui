@@ -197,7 +197,7 @@ export class PollinationsService {
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('⚠️ API key required. Please add your Pollinations API key in Settings → Your API Key. Get one at enter.pollinations.ai');
+          throw new Error('⚠️ API key required. Connect BYOP at enter.pollinations.ai or add a key from your account.');
         }
         if (response.status === 402) {
           throw new Error('⚠️ Insufficient pollen balance. Please check your account at enter.pollinations.ai');

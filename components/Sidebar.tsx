@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, MessageSquare, Settings, Menu, X, Trash2 } from 'lucide-react';
+import { Plus, MessageSquare, Link as LinkIcon, Menu, X, Trash2 } from 'lucide-react';
 import { ChatSession } from '../types';
 
 interface SidebarProps {
@@ -10,7 +10,7 @@ interface SidebarProps {
   onSelectSession: (id: string) => void;
   onNewChat: () => void;
   onDeleteSession: (e: React.MouseEvent, id: string) => void;
-  onOpenSettings: () => void;
+  onConnectByop: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -21,7 +21,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectSession,
   onNewChat,
   onDeleteSession,
-  onOpenSettings
+  onConnectByop
 }) => {
   return (
     <>
@@ -89,11 +89,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Bottom Menu */}
         <div className="p-4 border-t border-[#444746]">
           <button 
-            onClick={onOpenSettings}
+            onClick={onConnectByop}
             className="flex items-center gap-3 text-sm text-gray-300 hover:bg-[#333537] w-full p-3 rounded-lg transition-colors"
           >
-            <Settings size={18} />
-            <span>Settings</span>
+            <LinkIcon size={18} />
+            <span>Connect BYOP</span>
           </button>
           
           <div className="mt-2 text-xs text-gray-500 px-3">

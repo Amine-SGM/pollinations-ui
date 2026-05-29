@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatArea } from './components/ChatArea';
-import { SettingsModal } from './components/SettingsModal';
 import { PollinationsService } from './services/pollinationsService';
 import { ChatSession, Message, AppSettings, MediaType, GenerationParams } from './types';
 import { WELCOME_SUGGESTIONS, TEXT_MODELS, IMAGE_MODELS, VIDEO_MODELS, AUDIO_MODELS } from './constants';
@@ -22,7 +21,6 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 const App: React.FC = () => {
   // State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -59,19 +57,19 @@ const App: React.FC = () => {
     negativePrompt: ''
   });
 
-  // Settings State — apiKey is the user's personal key only.
-  // The developer's public key (VITE_POLLINATIONS_API_KEY) is handled
-  // transparently inside pollinationsService as a fallback.
+  // Settings state — apiKey can come from BYOP or a saved override.
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('pollinations_settings');
-
-    return saved ? JSON.parse(saved) : {
+    const byopApiKey = new URLSearchParams(window.location.hash.slice(1)).get('api_key')?.trim() || '';
+    const baseSettings = saved ? JSON.parse(saved) : {
       apiKey: 'pk_gWWKNs9f8NS8DqCW',          // empty = use the env public key as fallback
       textModel: 'openai',
       imageModel: 'flux',
       videoModel: 'veo',
       audioModel: 'openai-audio'
     };
+
+    return byopApiKey ? { ...baseSettings, apiKey: byopApiKey } : baseSettings;
   });
 
   const pollinationsService = useRef(new PollinationsService(settings)).current;
@@ -79,6 +77,35 @@ const App: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  const connectByop = () => {
+    const authUrl = new URL('https://enter.pollinations.ai/authorize');
+    authUrl.searchParams.set('redirect_uri', window.location.href.split('#')[0]);
+
+    const clientId = (import.meta as any).env.VITE_POLLINATIONS_APP_KEY || (import.meta as any).env.VITE_POLLINATIONS_CLIENT_ID || '';
+    if (clientId) {
+      authUrl.searchParams.set('client_id', clientId);
+    }
+
+    window.location.assign(authUrl.toString());
+  };
+
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const authError = hashParams.get('error');
+
+    if (!authError && !hashParams.get('api_key')) return;
+
+    window.history.replaceState(null, '', window.location.href.split('#')[0]);
+
+    if (authError) {
+      alert(
+        authError === 'access_denied'
+          ? 'Pollinations BYOP authorization was canceled.'
+          : `Pollinations BYOP authorization failed: ${authError}`
+      );
+    }
+  }, []);
 
   // Initialize sessions
   useEffect(() => {
@@ -480,7 +507,7 @@ const App: React.FC = () => {
         }}
         onNewChat={createNewSession}
         onDeleteSession={deleteSession}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onConnectByop={connectByop}
       />
 
       <main className="flex-1 flex flex-col relative min-w-0">
@@ -504,12 +531,14 @@ const App: React.FC = () => {
           <div className="mx-4 mb-2 flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 text-sm">
             <span className="text-amber-400 text-lg">⚠️</span>
             <span className="text-amber-300 flex-1">
-              No API key configured. Generations require an API key.{' '}
-              <a href="https://enter.pollinations.ai" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-100 transition-colors">
-                Get a free key at enter.pollinations.ai
-              </a>
-              {' '}then paste it in <button onClick={() => setIsSettingsOpen(true)} className="underline hover:text-amber-100 transition-colors">Settings</button>.
+              No BYOP key configured. Connect your account to authorize this app.
             </span>
+            <button
+              onClick={connectByop}
+              className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-400/20 transition-colors"
+            >
+              Connect BYOP
+            </button>
           </div>
         )}
 
@@ -627,13 +656,6 @@ const App: React.FC = () => {
           </p>
         </div>
       </main>
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onSave={setSettings}
-      />
 
       {/* Right Sidebar Params Implementation */}
       {/* Backdrop */}
