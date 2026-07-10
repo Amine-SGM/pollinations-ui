@@ -1,4 +1,4 @@
-export type MediaType = 'text' | 'image' | 'video' | 'audio';
+export type MediaType = 'text' | 'image' | 'video' | 'audio' | 'realtime';
 
 export interface GenerationParams {
   width?: number;
@@ -39,4 +39,5 @@ export interface AppSettings {
   imageModel: string;
   videoModel: string;
   audioModel: string;
+  realtimeModel: string;
 }

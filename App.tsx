@@ -3,7 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { ChatArea } from './components/ChatArea';
 import { PollinationsService } from './services/pollinationsService';
 import { ChatSession, Message, AppSettings, MediaType, GenerationParams } from './types';
-import { WELCOME_SUGGESTIONS, TEXT_MODELS, IMAGE_MODELS, VIDEO_MODELS, AUDIO_MODELS } from './constants';
+import { WELCOME_SUGGESTIONS, TEXT_MODELS, IMAGE_MODELS, VIDEO_MODELS, AUDIO_MODELS, REALTIME_MODELS } from './constants';
 
 const API_BASE = 'https://gen.pollinations.ai';
 import { Send, Image as ImageIcon, Mic, Menu, MessageSquare, Film, Music, Monitor, Smartphone, Maximize, Wand2, Lock, Eye, Code, Square, Plus, SlidersHorizontal, CircleOff, Hash, ChevronDown, Thermometer, Brain, Clock, Zap, Link as LinkIcon, X, Ban } from 'lucide-react';
@@ -117,6 +117,7 @@ const App: React.FC = () => {
   const [imageModels, setImageModels] = useState<ModelOption[]>(toFallbackModelOptions(IMAGE_MODELS));
   const [videoModels, setVideoModels] = useState<ModelOption[]>(toFallbackModelOptions(VIDEO_MODELS));
   const [audioModels, setAudioModels] = useState<ModelOption[]>(toFallbackModelOptions(AUDIO_MODELS));
+  const [realtimeModels, setRealtimeModels] = useState<ModelOption[]>(toFallbackModelOptions(REALTIME_MODELS));
 
   // UI State
   const [showParams, setShowParams] = useState(false);
@@ -151,7 +152,8 @@ const App: React.FC = () => {
       textModel: 'openai',
       imageModel: 'flux',
       videoModel: 'veo',
-      audioModel: 'openai-audio'
+      audioModel: 'openai-audio',
+      realtimeModel: 'gpt-realtime-2'
     };
 
     return byopApiKey ? { ...baseSettings, apiKey: byopApiKey } : baseSettings;
@@ -245,6 +247,19 @@ const App: React.FC = () => {
         if (videoOptions.length > 0) setVideoModels(videoOptions);
       })
       .catch(() => { });
+
+    // Realtime models (fetch from /models and filter by category realtime)
+    fetch(`${API_BASE}/models`, { headers: authHeader })
+      .then(r => r.json())
+      .then((data: any[]) => {
+        const realtimeData = data.filter(model => model.category === 'realtime' || model.name === 'gpt-realtime-2');
+        const realtimeOptions = realtimeData.map(model => ({
+          id: model.name || model.id || '',
+          label: getDocModelLabel(model)
+        }));
+        if (realtimeOptions.length > 0) setRealtimeModels(realtimeOptions);
+      })
+      .catch(() => { });
   }, []); // run once on mount
 
   // When dynamic models load, ensure selected models are still valid
@@ -255,8 +270,9 @@ const App: React.FC = () => {
       imageModel: imageModels.some(model => model.id === prev.imageModel) ? prev.imageModel : imageModels[0]?.id || prev.imageModel,
       videoModel: videoModels.some(model => model.id === prev.videoModel) ? prev.videoModel : videoModels[0]?.id || prev.videoModel,
       audioModel: audioModels.some(model => model.id === prev.audioModel) ? prev.audioModel : audioModels[0]?.id || prev.audioModel,
+      realtimeModel: realtimeModels.some(model => model.id === prev.realtimeModel) ? prev.realtimeModel : realtimeModels[0]?.id || prev.realtimeModel,
     }));
-  }, [textModels, imageModels, videoModels, audioModels]);
+  }, [textModels, imageModels, videoModels, audioModels, realtimeModels]);
 
   useEffect(() => {
     localStorage.setItem('pollinations_sessions', JSON.stringify(sessions));
@@ -430,6 +446,66 @@ const App: React.FC = () => {
       let botMessage: Message;
       const seed = genParams.seed || Math.floor(Math.random() * 1000000);
 
+      if (selectedMode === 'realtime') {
+        const botMsgId = generateId();
+        let fullContent = '';
+
+        const initialBotMessage: Message = {
+          id: botMsgId,
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+          mediaType: 'text'
+        };
+
+        setSessions(prev => prev.map(session => {
+          if (session.id === currentSessionId) {
+            return {
+              ...session,
+              messages: [...session.messages, initialBotMessage]
+            };
+          }
+          return session;
+        }));
+
+        await new Promise<void>((resolve) => {
+          pollinationsServiceRef.current.sendRealtimeMessage(
+            userMessage.content,
+            history,
+            (delta) => {
+              fullContent += delta;
+              setSessions(prev => prev.map(session => {
+                if (session.id === currentSessionId) {
+                  return {
+                    ...session,
+                    messages: session.messages.map(m => m.id === botMsgId ? { ...m, content: fullContent } : m)
+                  };
+                }
+                return session;
+              }));
+            },
+            (finalText) => {
+              resolve();
+            },
+            (err) => {
+              setSessions(prev => prev.map(session => {
+                if (session.id === currentSessionId) {
+                  return {
+                    ...session,
+                    messages: session.messages.map(m => m.id === botMsgId ? { ...m, content: fullContent + `\n\n⚠️ Error during realtime session: ${err.message}` } : m)
+                  };
+                }
+                return session;
+              }));
+              resolve();
+            }
+          );
+        });
+
+        setIsLoading(false);
+        return;
+      }
+
       if (selectedMode === 'text') {
         const responseContent = await pollinationsServiceRef.current.sendTextMessage(userMessage.content, history, { ...genParams, seed });
         botMessage = {
@@ -556,6 +632,7 @@ const App: React.FC = () => {
       case 'image': return settings.imageModel;
       case 'video': return settings.videoModel;
       case 'audio': return settings.audioModel;
+      case 'realtime': return settings.realtimeModel;
       default: return '';
     }
   };
@@ -567,6 +644,7 @@ const App: React.FC = () => {
       case 'image': return imageModels;
       case 'video': return videoModels;
       case 'audio': return audioModels;
+      case 'realtime': return realtimeModels;
       default: return [];
     }
   };
@@ -633,8 +711,8 @@ const App: React.FC = () => {
 
           {/* Mode Selector */}
           <div className="flex justify-center mb-4">
-            <div className="bg-[#1e1f20] border border-[#444746] rounded-full p-1 flex gap-1 shadow-md">
-              {(['text', 'image', 'video', 'audio'] as MediaType[]).map((mode) => (
+            <div className="bg-[#1e1f20] border border-[#444746] rounded-full p-1 flex gap-1 shadow-md flex-wrap justify-center animate-fade-in">
+              {(['text', 'image', 'video', 'audio', 'realtime'] as MediaType[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => {
@@ -651,6 +729,7 @@ const App: React.FC = () => {
                   {mode === 'image' && <ImageIcon size={16} />}
                   {mode === 'video' && <Film size={16} />}
                   {mode === 'audio' && <Music size={16} />}
+                  {mode === 'realtime' && <Zap size={16} />}
                   <span className="capitalize">{mode}</span>
                 </button>
               ))}
@@ -697,6 +776,7 @@ const App: React.FC = () => {
                           imageModel: selectedMode === 'image' ? newModel : prev.imageModel,
                           videoModel: selectedMode === 'video' ? newModel : prev.videoModel,
                           audioModel: selectedMode === 'audio' ? newModel : prev.audioModel,
+                          realtimeModel: selectedMode === 'realtime' ? newModel : prev.realtimeModel,
                         }));
                       }}
                       className="w-full bg-[#0b0b0c] border border-[#444746] rounded-full px-4 py-2 pr-9 text-sm text-white focus:border-blue-500 outline-none transition-colors appearance-none cursor-pointer"

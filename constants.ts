@@ -57,3 +57,7 @@ export const VIDEO_MODELS = [
 export const AUDIO_MODELS = [
   'openai-audio'
 ];
+
+export const REALTIME_MODELS = [
+  'gpt-realtime-2'
+];

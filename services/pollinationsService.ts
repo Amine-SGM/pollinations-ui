@@ -223,4 +223,111 @@ export class PollinationsService {
       return `Error: ${error.message}`;
     }
   }
+
+  sendRealtimeMessage(
+    prompt: string,
+    history: { role: string; content: string }[],
+    onDelta: (text: string) => void,
+    onComplete: (fullText: string) => void,
+    onError: (err: Error) => void
+  ): WebSocket {
+    const wsUrl = new URL('wss://gen.pollinations.ai/v1/realtime');
+    wsUrl.searchParams.set('model', this.settings.realtimeModel || 'gpt-realtime-2');
+    
+    const apiKey = this.getApiKey();
+    if (apiKey) {
+      wsUrl.searchParams.set('key', apiKey);
+    }
+
+    const ws = new WebSocket(wsUrl.toString());
+    let fullText = '';
+    let completed = false;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: 'session.update',
+        session: {
+          modalities: ['text'],
+          instructions: 'You are a helpful AI assistant. Be concise and helpful.'
+        }
+      }));
+
+      // Send message history for context
+      history.forEach(msg => {
+        if (msg.content) {
+          ws.send(JSON.stringify({
+            type: 'conversation.item.create',
+            item: {
+              type: 'message',
+              role: msg.role === 'user' ? 'user' : 'assistant',
+              content: [
+                {
+                  type: 'input_text',
+                  text: msg.content
+                }
+              ]
+            }
+          }));
+        }
+      });
+
+      // Send new user message
+      ws.send(JSON.stringify({
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: prompt
+            }
+          ]
+        }
+      }));
+
+      // Trigger response generation
+      ws.send(JSON.stringify({
+        type: 'response.create'
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'response.text.delta' && data.delta) {
+          fullText += data.delta;
+          onDelta(data.delta);
+        } else if (data.type === 'response.audio_transcript.delta' && data.delta) {
+          fullText += data.delta;
+          onDelta(data.delta);
+        } else if (data.type === 'response.done') {
+          completed = true;
+          onComplete(fullText);
+          ws.close();
+        } else if (data.type === 'error') {
+          const errMsg = data.error?.message || 'Unknown server error';
+          onError(new Error(errMsg));
+          ws.close();
+        }
+      } catch (e: any) {
+        console.error('Failed to parse websocket message', e);
+      }
+    };
+
+    ws.onerror = (event) => {
+      if (!completed) {
+        onError(new Error('WebSocket connection error. Please make sure your API key and network connection are valid.'));
+      }
+    };
+
+    ws.onclose = () => {
+      if (!completed) {
+        onComplete(fullText);
+      }
+    };
+
+    return ws;
+  }
 }
