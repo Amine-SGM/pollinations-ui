@@ -73,9 +73,8 @@ type ModelOption = {
   label: string;
 };
 
-const getDocModelLabel = (model: { name?: string; description?: string }) => {
-  const labelFromDocs = model.description?.split(' - ')[0]?.trim();
-  return labelFromDocs || formatModelLabel(model.name || '');
+const getDocModelLabel = (model: { name?: string; title?: string }) => {
+  return model.title?.trim() || formatModelLabel(model.name || '');
 };
 
 const toFallbackModelOptions = (models: string[]): ModelOption[] => models.map(id => ({
@@ -104,6 +103,8 @@ const toModelOptions = (models: any[], modality: MediaType, excludeSpecialized =
 };
 
 const App: React.FC = () => {
+  const requestedTextModel = new URLSearchParams(window.location.search).get('model')?.trim() || '';
+
   // State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -113,7 +114,12 @@ const App: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
 
   // Dynamic models
-  const [textModels, setTextModels] = useState<ModelOption[]>(toFallbackModelOptions(TEXT_MODELS));
+  const [textModels, setTextModels] = useState<ModelOption[]>(() => {
+    const fallbackModels = toFallbackModelOptions(TEXT_MODELS);
+    return requestedTextModel && !fallbackModels.some(model => model.id === requestedTextModel)
+      ? [{ id: requestedTextModel, label: formatModelLabel(requestedTextModel) }, ...fallbackModels]
+      : fallbackModels;
+  });
   const [imageModels, setImageModels] = useState<ModelOption[]>(toFallbackModelOptions(IMAGE_MODELS));
   const [videoModels, setVideoModels] = useState<ModelOption[]>(toFallbackModelOptions(VIDEO_MODELS));
   const [audioModels, setAudioModels] = useState<ModelOption[]>(toFallbackModelOptions(AUDIO_MODELS));
@@ -156,7 +162,11 @@ const App: React.FC = () => {
       realtimeModel: 'gpt-realtime-2'
     };
 
-    return byopApiKey ? { ...baseSettings, apiKey: byopApiKey } : baseSettings;
+    return {
+      ...baseSettings,
+      ...(requestedTextModel && { textModel: requestedTextModel }),
+      ...(byopApiKey && { apiKey: byopApiKey }),
+    };
   });
 
   const pollinationsService = useRef(new PollinationsService(settings)).current;

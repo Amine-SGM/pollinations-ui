@@ -58,6 +58,12 @@ A modern, feature-rich chat interface for interacting with the [Pollinations AI]
 
 4. Open your browser and navigate to `http://localhost:5173`.
 
+To open the chat with a text model selected, add its ID as the `model` query parameter, for example:
+
+```
+https://pollinations-ui.vercel.app/?model=voodoohop%2Fhumans-api
+```
+
 
 ## 📂 Project Structure
 
@@ -83,4 +89,3 @@ This project is licensed under the MIT License.
 | **Discord Username** | [Your Discord Username] |
 | **Contact / Email** | [Your Email/Twitter/Contact] |
 | **App Language** | English (en) |
-
