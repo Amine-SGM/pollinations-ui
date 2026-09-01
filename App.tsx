@@ -73,10 +73,8 @@ type ModelOption = {
   label: string;
 };
 
-const getDocModelLabel = (model: { name?: string; description?: string }) => {
-  const labelFromDocs = model.description?.split(' - ')[0]?.trim();
-  return labelFromDocs || formatModelLabel(model.name || '');
-};
+const getModelLabel = (model: { id?: string; name?: string; title?: string }) =>
+  model.title?.trim() || formatModelLabel(model.name || model.id || '');
 
 const toFallbackModelOptions = (models: string[]): ModelOption[] => models.map(id => ({
   id,
@@ -91,7 +89,7 @@ const toModelOptions = (models: any[], modality: MediaType, excludeSpecialized =
     .filter(model => !excludeSpecialized || !model.is_specialized)
     .map(model => ({
       id: model.name ?? model.id ?? '',
-      label: getDocModelLabel(model),
+      label: getModelLabel(model),
     }))
     .filter(model => {
       if (!model.id || seen.has(model.id)) {
@@ -255,7 +253,7 @@ const App: React.FC = () => {
         const realtimeData = data.filter(model => model.category === 'realtime' || model.name === 'gpt-realtime-2');
         const realtimeOptions = realtimeData.map(model => ({
           id: model.name || model.id || '',
-          label: getDocModelLabel(model)
+          label: getModelLabel(model)
         }));
         if (realtimeOptions.length > 0) setRealtimeModels(realtimeOptions);
       })
