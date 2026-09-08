@@ -126,11 +126,7 @@ export class PollinationsService {
     const encodedPrompt = encodeURIComponent(prompt);
     const query = new URLSearchParams();
 
-    let model = this.settings.audioModel || 'elevenlabs';
-    // Strip out any text-only models that don't belong on the audio endpoint
-    if (!['elevenlabs', 'elevenmusic'].includes(model)) {
-      model = 'elevenlabs';
-    }
+    const model = this.settings.audioModel || 'elevenlabs';
 
     query.append('model', model);
     query.append('seed', seed.toString());
